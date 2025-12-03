@@ -5,16 +5,13 @@ require('dotenv').config();
 
 const app = express();
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Conexión a MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ Conectado a MongoDB'))
   .catch(err => console.error('❌ Error MongoDB:', err));
 
-// Modelo de Conversión
 const ConversionSchema = new mongoose.Schema({
   fecha: { type: Date, default: Date.now },
   cantidad: Number,
@@ -26,8 +23,6 @@ const ConversionSchema = new mongoose.Schema({
 
 const Conversion = mongoose.model('Conversion', ConversionSchema);
 
-// Rutas
-// Obtener historial
 app.get('/api/conversiones', async (req, res) => {
   try {
     const conversiones = await Conversion.find()
@@ -39,7 +34,6 @@ app.get('/api/conversiones', async (req, res) => {
   }
 });
 
-// Guardar conversión
 app.post('/api/conversiones', async (req, res) => {
   try {
     const nuevaConversion = new Conversion(req.body);
@@ -50,7 +44,6 @@ app.post('/api/conversiones', async (req, res) => {
   }
 });
 
-// Limpiar historial
 app.delete('/api/conversiones', async (req, res) => {
   try {
     await Conversion.deleteMany({});
