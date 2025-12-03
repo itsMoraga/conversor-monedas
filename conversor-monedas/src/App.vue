@@ -1,6 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 
+// API Key
+const API_KEY = 'e0cff5baab6eec029dbcb818'
+const BACKEND_URL = 'http://localhost:3000/api'
+
 // Variables reactivas
 const cantidad = ref(1)
 const monedaOrigen = ref('USD')
@@ -15,11 +19,8 @@ const error = ref('')
 // Cargar monedas disponibles al iniciar
 onMounted(async () => {
   await cargarMonedas()
-  cargarHistorial()
+  await cargarHistorial()
 })
-
-// API Key
-const API_KEY = 'e0cff5baab6eec029dbcb818'
 
 // Obtener lista de monedas desde la API
 async function cargarMonedas() {
@@ -50,8 +51,8 @@ async function convertir() {
     tasaCambio.value = data.conversion_rates[monedaDestino.value]
     resultado.value = (cantidad.value * tasaCambio.value).toFixed(2)
 
-    // Guardar en historial
-    agregarAlHistorial()
+    // Guardar en MongoDB
+    await guardarEnMongoDB()
   } catch (err) {
     error.value = 'Error al realizar la conversión. Intenta nuevamente.'
     console.error(err)
@@ -60,41 +61,64 @@ async function convertir() {
   }
 }
 
-// Agregar conversión al historial
-function agregarAlHistorial() {
-  const conversion = {
-    id: Date.now(),
-    fecha: new Date().toLocaleString(),
-    cantidad: cantidad.value,
-    de: monedaOrigen.value,
-    a: monedaDestino.value,
-    resultado: resultado.value,
-    tasa: tasaCambio.value
-  }
+// Guardar conversión en MongoDB
+async function guardarEnMongoDB() {
+  try {
+    const conversion = {
+      cantidad: cantidad.value,
+      de: monedaOrigen.value,
+      a: monedaDestino.value,
+      resultado: parseFloat(resultado.value),
+      tasa: tasaCambio.value
+    }
 
-  historial.value.unshift(conversion)
-  
-  // Limitar historial a 10 elementos
-  if (historial.value.length > 10) {
-    historial.value = historial.value.slice(0, 10)
-  }
+    await fetch(`${BACKEND_URL}/conversiones`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(conversion)
+    })
 
-  // Guardar en localStorage
-  localStorage.setItem('historialConversiones', JSON.stringify(historial.value))
-}
-
-// Cargar historial desde localStorage
-function cargarHistorial() {
-  const historialGuardado = localStorage.getItem('historialConversiones')
-  if (historialGuardado) {
-    historial.value = JSON.parse(historialGuardado)
+    // Recargar historial
+    await cargarHistorial()
+  } catch (err) {
+    console.error('Error al guardar en MongoDB:', err)
   }
 }
 
-// Limpiar historial
-function limpiarHistorial() {
-  historial.value = []
-  localStorage.removeItem('historialConversiones')
+// Cargar historial desde MongoDB
+async function cargarHistorial() {
+  try {
+    const response = await fetch(`${BACKEND_URL}/conversiones`)
+    const data = await response.json()
+    historial.value = data
+  } catch (err) {
+    console.error('Error al cargar historial:', err)
+  }
+}
+
+// Limpiar historial en MongoDB
+async function limpiarHistorial() {
+  try {
+    await fetch(`${BACKEND_URL}/conversiones`, {
+      method: 'DELETE'
+    })
+    historial.value = []
+  } catch (err) {
+    console.error('Error al limpiar historial:', err)
+  }
+}
+
+// Formatear fecha
+function formatearFecha(fecha) {
+  return new Date(fecha).toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 </script>
 
@@ -150,9 +174,9 @@ function limpiarHistorial() {
         <button @click="limpiarHistorial" class="btn-limpiar">Limpiar</button>
       </div>
       
-      <div class="historial-item" v-for="item in historial" :key="item.id">
+      <div class="historial-item" v-for="item in historial" :key="item._id">
         <span>{{ item.cantidad }} {{ item.de }} → {{ item.resultado }} {{ item.a }}</span>
-        <small>{{ item.fecha }}</small>
+        <small>{{ formatearFecha(item.fecha) }}</small>
       </div>
     </div>
   </div>
