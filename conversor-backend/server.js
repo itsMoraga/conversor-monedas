@@ -5,13 +5,16 @@ require('dotenv').config();
 
 const app = express();
 
+// Middlewares - IMPORTANTE: antes de las rutas
 app.use(cors());
 app.use(express.json());
 
+// Conexión a MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ Conectado a MongoDB'))
   .catch(err => console.error('❌ Error MongoDB:', err));
 
+// Modelo de Conversión
 const ConversionSchema = new mongoose.Schema({
   fecha: { type: Date, default: Date.now },
   cantidad: Number,
@@ -23,6 +26,7 @@ const ConversionSchema = new mongoose.Schema({
 
 const Conversion = mongoose.model('Conversion', ConversionSchema);
 
+// Rutas
 app.get('/api/conversiones', async (req, res) => {
   try {
     const conversiones = await Conversion.find()
@@ -30,17 +34,21 @@ app.get('/api/conversiones', async (req, res) => {
       .limit(10);
     res.json(conversiones);
   } catch (error) {
+    console.error('Error al obtener:', error);
     res.status(500).json({ error: 'Error al obtener conversiones' });
   }
 });
 
 app.post('/api/conversiones', async (req, res) => {
   try {
+    console.log('Datos recibidos:', req.body); // Debug
     const nuevaConversion = new Conversion(req.body);
     await nuevaConversion.save();
+    console.log('Conversión guardada:', nuevaConversion); // Debug
     res.status(201).json(nuevaConversion);
   } catch (error) {
-    res.status(500).json({ error: 'Error al guardar conversión' });
+    console.error('Error al guardar:', error);
+    res.status(500).json({ error: 'Error al guardar conversión', details: error.message });
   }
 });
 
@@ -49,6 +57,7 @@ app.delete('/api/conversiones', async (req, res) => {
     await Conversion.deleteMany({});
     res.json({ message: 'Historial limpiado' });
   } catch (error) {
+    console.error('Error al limpiar:', error);
     res.status(500).json({ error: 'Error al limpiar historial' });
   }
 });
